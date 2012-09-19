@@ -37,16 +37,16 @@ label {
 == Cool Values
 
 << Magic Orb >>
-{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"color","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":20,"maxSegments":5,"overdraw":2}
+{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"color","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":20,"maxSegments":5,"overdraw":2,"animateThickness":0}
 
 << Tim Burton's Trophy >>
-{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"grayscale","opacity":1,"thicknessMode":"random","minThickness":2,"maxThickness":50,"maxSegments":5,"overdraw":2}
+{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"grayscale","opacity":1,"thicknessMode":"random","minThickness":2,"maxThickness":50,"maxSegments":5,"overdraw":2,"animateThickness":0}
 
 << Bird's Nest >>
-{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2}
+{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2,"animateThickness":0}
 
 << The Wipeout >>
-{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixec","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2}
+{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixec","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2,"animateThickness":0}
 
 */
 
@@ -65,7 +65,8 @@ var options = {
       minThickness: 1,
       maxThickness: 1,
       maxSegments: 0,
-      overdraw: 1
+      overdraw: 1,
+      animateThickness: 0
     },
     delta_t,
     first,
@@ -282,17 +283,34 @@ function YC(y) {
 
 // Clears the canvas, draws the axes and graphs the function F.
 function Draw() {
+  var maxThickness,
+      animateThicknessInterval;
 
- if (canvasElem.getContext) {
 
-   // Set up the canvas:
-   Ctx = canvasElem.getContext('2d');
-   Ctx.clearRect(0, 0, Width, Height);
+  if (canvasElem.getContext) {
 
-   // Draw:
-   DrawAxes();
+    // Set up the canvas:
+    Ctx = canvasElem.getContext('2d');
+    Ctx.clearRect(0, 0, Width, Height);
 
-   RenderClaire();
+    // Draw:
+    DrawAxes();
+
+    if (options.animateThickness) {
+      maxThickness = options.maxThickness;
+      options.maxThickness = options.minThickness;
+      animateThicknessInterval = setInterval(function(){
+        Ctx.clearRect(0, 0, Width, Height);
+        RenderClaire();
+        options.maxThickness += options.animateThickness;
+        if (options.maxThickness > maxThickness) {
+          clearInterval(animateThicknessInterval);
+          options.maxThickness = maxThickness;
+        }
+      }, 0);
+    } else {
+      RenderClaire();
+    }
 
   } else {
     // Do nothing.
@@ -439,7 +457,8 @@ $(document).ready(function(){
     <label>minThickness</label> <input type="text" name="minThickness">
     <label>maxThickness</label> <input type="text" name="maxThickness">
     <label>maxSegments</label> <input type="text" name="maxSegments">
-    <label>overdraw</label> <input type="text" name="overdraw"><br>
+    <label>overdraw</label> <input type="text" name="overdraw">
+    <label>animateThickness</label> <input type="text" name="animateThickness"><br>
     <input class="btn-primary" type="submit" value="Draw">
   </form>
   <br>
