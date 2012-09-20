@@ -37,16 +37,19 @@ label {
 == Cool Values
 
 << Magic Orb >>
-{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"color","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":20,"maxSegments":5,"overdraw":2,"animateThickness":0}
+{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"color","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":20,"maxSegments":2,"overdraw":2,"animateThickness":0,"animateDelay":0}
 
 << Tim Burton's Trophy >>
-{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"grayscale","opacity":1,"thicknessMode":"random","minThickness":2,"maxThickness":50,"maxSegments":5,"overdraw":2,"animateThickness":0}
+{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"grayscale","opacity":1,"thicknessMode":"random","minThickness":2,"maxThickness":50,"maxSegments":5,"overdraw":2,"animateThickness":0,"animateDelay":0}
 
 << Bird's Nest >>
-{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2,"animateThickness":0}
+{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2,"animateThickness":0,"animateDelay":0}
 
 << The Wipeout >>
-{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixec","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2,"animateThickness":0}
+{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixec","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2,"animateThickness":0,"animateDelay":0}
+
+<< Mikey's Default >>
+{"minX":-0.0225,"maxX":0.0075,"minY":-0.0175,"maxY":0.012499999999999997,"TF":10,"dt":0.0001,"clxpo":1,"cloff":0.5,"colorMode":"rainbow","opacity":1,"thicknessMode":"fixed","minThickness":1,"maxThickness":1,"maxSegments":50,"overdraw":1,"animateThickness":0,"animateDelay":0}
 
 */
 
@@ -59,17 +62,19 @@ var options = {
       dt: '1 / Math.pow(10, 4)',
       clxpo: 1,
       cloff: 0.5,
-      colorMode: 'color', // supports 'color', 'grayscale', 'black', '#F00', 'rgb(75, 0, 100)'
+      colorMode: 'rainbow', // supports 'color', 'rainbow', 'grayscale', 'black', '#F00', 'rgb(75, 0, 100)'
       opacity: 1,
       thicknessMode: 'fixed', // supports 'random', 'fixed'
       minThickness: 1,
       maxThickness: 1,
-      maxSegments: 0,
+      maxSegments: 50,
       overdraw: 1,
-      animateThickness: 0
+      animateThickness: 0,
+      animateDelay: 0
     },
     delta_t,
     first,
+    heartbeat = 0,
     l,
     x,
     y,
@@ -118,6 +123,7 @@ function RenderClaire() {
         y = YC(x2[i]);
         Ctx.lineTo(x, y);
       }
+      heartbeat++;
     }
     Ctx.stroke();
   } else {
@@ -144,12 +150,25 @@ function RenderClaire() {
           }
       }
       Ctx.stroke();
+      heartbeat++;
       if (isNaN(x)) {
         console.log('done');
         clearInterval(drawCanvas);
       }
-    }, 0);
+    }, options.animateDelay);
   }
+}
+
+function rainbowColor(counter, phase, frequency) {
+    if (phase == undefined) phase = 0;
+    if (frequency == undefined) frequency = .3;
+    var colorValues = new Object();
+    center = 128;
+    width = 127;
+    colorValues.red   = Math.floor(Math.sin(frequency*counter+2+phase) * width + center);
+    colorValues.green = Math.floor(Math.sin(frequency*counter+0+phase) * width + center);
+    colorValues.blue  = Math.floor(Math.sin(frequency*counter+4+phase) * width + center);
+    return colorValues;
 }
 
 function setStrokeColor() {
@@ -158,18 +177,24 @@ function setStrokeColor() {
   var i, l, red, green, blue;
 
   if (options.colorMode === 'color') {
-    for (i = 0, l = 3; i < l; i++) {
-      red = Math.floor(Math.random() * 255);
-      green = Math.floor(Math.random() * 255);
-      blue = Math.floor(Math.random() * 255);
-      if (255 * 3 - (red + green + blue) > 64) break; //  Acceptable deviation from background color
-    }
-    Ctx.strokeStyle = 'rgba(' + red + ',' + green + ',' + blue + ',' + options.opacity + ')';
+      for (i = 0, l = 3; i < l; i++) {
+          red = Math.floor(Math.random() * 255);
+          green = Math.floor(Math.random() * 255);
+          blue = Math.floor(Math.random() * 255);
+          if (255 * 3 - (red + green + blue) > 64) break; //  Acceptable deviation from background color
+      }
+      Ctx.strokeStyle = 'rgba(' + red + ',' + green + ',' + blue + ',' + options.opacity + ')';
+  } else if (options.colorMode === 'rainbow') {
+      var colorValues = rainbowColor(heartbeat);
+      red = colorValues.red;
+      green = colorValues.green;
+      blue = colorValues.blue;
+      Ctx.strokeStyle = 'rgba(' + red + ',' + green + ',' + blue + ',' + options.opacity + ')';
   } else if (options.colorMode === 'grayscale') {
-    red = green = blue = Math.floor(Math.random() * 128);
-    Ctx.strokeStyle = 'rgba(' + red + ',' + green + ',' + blue + ',' + options.opacity + ')';
+      red = green = blue = Math.floor(Math.random() * 128);
+      Ctx.strokeStyle = 'rgba(' + red + ',' + green + ',' + blue + ',' + options.opacity + ')';
   } else {
-    Ctx.strokeStyle = options.colorMode;
+      Ctx.strokeStyle = options.colorMode;
   }
 }
 
@@ -194,6 +219,13 @@ function refresh() {
   retrieveFormValues();
   updateBookmark();
   Draw();
+}
+
+function initLinks(){
+    $('.colorSwitcher').click(function(e){
+        e.preventDefault();
+        options.colorMode = $(this).attr('data-colorMode');
+    })
 }
 
 function populateForm() {
@@ -420,7 +452,8 @@ $(document).ready(function(){
   Ctx = null;
   Width = Height = $(window).width();
   $canvas.attr('width', Width).attr('height', Width);
-
+  
+  initLinks();
   populateForm();
 
   refresh();
@@ -451,6 +484,12 @@ $(document).ready(function(){
     <label>dt</label> <input type="text" name="dt">
     <label>clxpo</label> <input type="text" name="clxpo">
     <label>cloff</label> <input type="text" name="cloff">
+    <br>
+    <a href="#" class="colorSwitcher" data-colorMode="color">color</a> |
+    <a href="#" class="colorSwitcher" data-colorMode="rainbow">rainbow</a> |
+    <a href="#" class="colorSwitcher" data-colorMode="grayscale">grayscale</a> |
+    <a href="#" class="colorSwitcher" data-colorMode="black">black</a>
+    <br>
     <label>colorMode</label> <input type="text" name="colorMode">
     <label>opacity</label> <input type="text" name="opacity">
     <label>thicknessMode</label> <input type="text" name="thicknessMode">
@@ -459,6 +498,7 @@ $(document).ready(function(){
     <label>maxSegments</label> <input type="text" name="maxSegments">
     <label>overdraw</label> <input type="text" name="overdraw">
     <label>animateThickness</label> <input type="text" name="animateThickness"><br>
+    <label>animateDelay</label> <input type="text" name="animateDelay"><br>
     <input class="btn-primary" type="submit" value="Draw">
   </form>
   <br>
