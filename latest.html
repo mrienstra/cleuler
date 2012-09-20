@@ -68,95 +68,89 @@ var options = {
       minThickness: 1,
       maxThickness: 1,
       maxSegments: 50,
+      maxSteps: 200000, // you may set this to 0 to run forever
       overdraw: 1,
       animateThickness: 0,
       animateDelay: 0
     },
-    delta_t,
     first,
     heartbeat = 0,
     l,
     x,
     y,
+    T = -options.TF,
+    theta = 0,
+    x1 = 0,
+    x2 = 0,
     hideAxes = true;
 
+function eulerSpiral(){
+    x1 += options.dt * Math.cos(theta);
+    x2 += options.dt * Math.sin(theta);
+    T += options.dt;
+    theta -= Math.PI / (options.cloff * Math.pow(T, options.clxpo) + Math.pow(10,-12));
+}
+
 function RenderClaire() {
-  var T = [],
-      i = -1 * options.TF,
-      theta = [0],
-      x1 = [0],
-      x2 = [0],
-      velocity = 1;
+    l = 2*options.TF/options.dt;
 
-  while (i <= options.TF * options.overdraw) {
-    T.push(i);
-    i += options.dt;
-  }
-
-  for (i = 1, l = T.length; i < l; i++) {
-    theta[i] = theta[i - 1] - Math.PI / (options.cloff * Math.pow(T[i], options.clxpo) + Math.pow(10,-12));
-  }
-
-  for (i = 1, l = T.length; i < l; i++) {
-    delta_t = T[i] - T[i - 1];
-    x1[i] = x1[i - 1] + velocity * delta_t * Math.cos(theta[i - 1]);
-    x2[i] = x2[i - 1] + velocity * delta_t * Math.sin(theta[i - 1]);
-  }
-
-// put the pen down (initial values) //
-  i = 0;
-  l = T.length;
-
-  if (options.maxSegments === 0) {
-    // All in one go
-    setStrokeColor();
-    setStrokeThickness();
-    setLineCap();
-    Ctx.beginPath();
-    for (i = 0; i < l; i++){
-      if (i === 0) {
-        x = XC(x1[i]);
-        y = YC(x2[i]);
-        Ctx.moveTo(x, y);
-      } else {
-        x = XC(x1[i]);
-        y = YC(x2[i]);
-        Ctx.lineTo(x, y);
-      }
-      heartbeat++;
-    }
-    Ctx.stroke();
-  } else {
-    // Animate
+    // Draw all at once
+    if (options.maxSegments === 0) {
+        // initialize the canvas //
+        setStrokeColor();
+        setStrokeThickness();
+        setLineCap();
+        Ctx.beginPath();
+        // compute segments //
+        while (heartbeat < l) {
+            eulerSpiral();
+            if (heartbeat === 0) {
+                x = XC(x1);
+                y = YC(x2);
+                Ctx.moveTo(x, y);
+            } else {
+                x = XC(x1);
+                y = YC(x2);
+                Ctx.lineTo(x, y);
+            }
+            heartbeat++;
+        }
+        // draw segments //
+        Ctx.stroke();
+    } else {
+    // Draw animated
     // Todo: use "requestAnimationFrame"
-    var drawCanvas = setInterval(function(){
-      setStrokeColor();
-      setStrokeThickness();
-      setLineCap();
-    // NOW START DRAWING...
-      Ctx.beginPath();
-      if (i === 0) {
-        x = XC(x1[i]);
-        y = YC(x2[i]);
-        Ctx.moveTo(x, y);
-        i++;
-      } else {
-          Ctx.moveTo(x, y);
-          for (j = 0; j < options.maxSegments; j++){
-            x = XC(x1[i]);
-            y = YC(x2[i]);
-            Ctx.lineTo(x, y);
-            i++;
-          }
-      }
-      Ctx.stroke();
-      heartbeat++;
-      if (isNaN(x)) {
-        console.log('done');
-        clearInterval(drawCanvas);
-      }
-    }, options.animateDelay);
-  }
+        var drawCanvas = setInterval(function(){
+            // initialize the canvas //
+            setStrokeColor();
+            setStrokeThickness();
+            setLineCap();
+            Ctx.beginPath();
+            // compute segments //
+            if (heartbeat === 0) {
+                x = XC(x1);
+                y = YC(x2);
+                Ctx.moveTo(x, y);
+                heartbeat++;
+            } else {
+                for (j = 0; j < options.maxSegments; j++){
+                    Ctx.moveTo(x, y);
+                    x = XC(x1);
+                    y = YC(x2);
+                    Ctx.lineTo(x, y);
+                    eulerSpiral();
+                    heartbeat++;
+                }
+            }
+            // draw segments //
+            Ctx.stroke();
+            // end loop when we've hit maxSteps
+            if (options.maxSteps != 0 && heartbeat > options.maxSteps) {
+                console.log('done');
+                clearInterval(drawCanvas);
+            }
+        }, options.animateDelay);
+    }
 }
 
 function rainbowColor(counter, phase, frequency) {
@@ -496,6 +490,7 @@ $(document).ready(function(){
     <label>minThickness</label> <input type="text" name="minThickness">
     <label>maxThickness</label> <input type="text" name="maxThickness">
     <label>maxSegments</label> <input type="text" name="maxSegments">
+    <label>maxSteps</label> <input type="text" name="maxSteps">
     <label>overdraw</label> <input type="text" name="overdraw">
     <label>animateThickness</label> <input type="text" name="animateThickness"><br>
     <label>animateDelay</label> <input type="text" name="animateDelay"><br>
