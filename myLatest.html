@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<title>Claire-Euler "Coiler"</title>
+<link rel="stylesheet" href="http://twitter.github.com/bootstrap/assets/css/bootstrap.css">
+<style>
+.controls {
+  position: absolute;
+  right: 10px;
+  top: 5px;
+  opacity: 1;
+}
+.showControls, .hideControls {
+  position: absolute;
+  top: 7px;
+  right: 10px;
+  padding-top: 0;
+}
+form {
+  clear: both;
+  padding-top: 30px;
+}
+form div {
+  position: relative;
+}
+label {
+  text-shadow: 0 0 6px black; /* 0 0 1px white, 0 0 2px white, 0 0 3px white, 0 0 4px white, 0 0 5px white, 0 0 6px white; */
+  right: 6px;
+  position: absolute;
+  top: 5px;
+  font-weight: bold;
+  color: white;
+}
+.btn-primary {
+  float: right;
+}
+</style>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.1/jquery.min.js"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.23/jquery-ui.min.js"></script>
+<script>
+
+/*
+
+== Cool Values
+
+<< Magic Orb >>
+{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"color","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":20,"maxSegments":5,"overdraw":2,"animateThickness":0}
+
+<< Tim Burton's Trophy >>
+{"minX":-0.1,"maxX":0.1,"minY":-0.15,"maxY":0.05,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.02,"colorMode":"grayscale","opacity":1,"thicknessMode":"random","minThickness":2,"maxThickness":50,"maxSegments":5,"overdraw":2,"animateThickness":0}
+
+<< Bird's Nest >>
+{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixed","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2,"animateThickness":0}
+
+<< The Wipeout >>
+{"minX":-0.001,"maxX":0.001,"minY":-0.001,"maxY":0.001,"TF":10,"dt":0.001,"clxpo":1,"cloff":0.04,"colorMode":"grayscale","opacity":1,"thicknessMode":"fixec","minThickness":2,"maxThickness":10,"maxSegments":5,"overdraw":2,"animateThickness":0}
+
+*/
+
+/*
+
+Todo:
+
+Use "renderOnAddition = false" if we want to have a multi-color without animating?
+
+Several different ways of cropping: calculate bounds & show the whole thing; calculate center & a set of points at plus & minus 3%, 12%, 30% (or something like that) & use those points to come up with a tighter crop.
+
+In the browsing modes discussed below, it would be nice to keep cropping "deltas" gradual and intuitive (like a smooth camera pan / zoom).
+
+Two browsing modes:
+  1. Show "variations" in an "endless" grid, allowing anything to change along each axis, also allow logarithmic or algorithmic(?) scales. Use multiple canvases (or export canvas as data URI). Preload (possibly just the calculation of points without rendering -- though a thumbnail & a "tight crop" would probably take less memory to store, to cache) if it makes sense. Could also be 3D, but the reduction in data density might be a big compromise.
+  2. Show variations as movies. I'm imagining they would loop "away". Using a 3x3 grid of 8 movies (& 1 still image in the center) would allow either 4 dimensions or 2 dimensions and the corners would show a movie of both dimensions changing at once (more like view #1). Would be awesome to have an intuitive way to "scrub". Ideally the individual frames would be cached & reused as needed, as many of them would remain the same when making small changes along an axis.
+
+In both modes it would be easy to see what numbers were being used, either in the form of labels / captions (optional) or on hover. Click to change center point.
+
+*/
+
+var options = {
+      minX: -0.0225, // left boundary of the logical viewport
+      maxX: 'options.minX + 0.03', // right boundary of the logical viewport
+      maxY: 0.013, // top boundary of the logical viewport
+      minY: 'options.maxY - (options.maxX - options.minX)', // bottom boundary of the logical viewport
+      TF: 10,
+      dt: '1 / Math.pow(10, 4)',
+      clxpo: 1,
+      cloff: 0.5,
+      colorMode: 'color', // supports 'color', 'grayscale', 'black', '#F00', 'rgb(75, 0, 100)'
+      opacity: 1,
+      thicknessMode: 'fixed', // supports 'random', 'fixed'
+      minThickness: 1,
+      maxThickness: 1,
+      maxSegments: 0,
+      overdraw: 1,
+      animateThickness: 0,
+      animateTF: 0,
+      minTF: 0
+    },
+    delta_t,
+    first,
+    x,
+    y,
+    minX,
+    maxX,
+    minY,
+    maxY,
+    autoSize = true,
+    hideAxes = true,
+    previousCoords;
+
+function RenderClaire(undefined) {
+  var i = -1 * options.TF,
+      T = [],
+      dt = eval(options.dt),
+      l,
+      theta = [0],
+      x1 = [0],
+      x2 = [0],
+      localMinX,
+      localMaxX,
+      localMinY,
+      localMaxY,
+      velocity = 1,
+      onePercent;
+
+  console.log('dt', dt, 'i', i, 'options.TF', options.TF, 'options.overdraw', options.overdraw, 'options.TF * options.overdraw', options.TF * options.overdraw);
+
+  if (false && previousCoords) {
+    x1 = previousCoords.x1;
+    x2 = previousCoords.x2;
+    localMinX = previousCoords.localMinX;
+    localMaxX = previousCoords.localMaxX;
+    localMaxY = previousCoords.localMaxY;
+    localMinY = previousCoords.localMinY;
+  } else {
+
+    while (i <= options.TF * options.overdraw) {
+      T.push(i);
+      i += dt;
+    }
+
+    console.log('T.length', T.length);
+
+    for (i = 1, l = T.length; i < l; i++) {
+      theta[i] = theta[i - 1] - Math.PI / (options.cloff * Math.pow(T[i], options.clxpo) + Math.pow(10,-12));
+    }
+
+    for (i = 1, l = T.length; i < l; i++) {
+      delta_t = T[i] - T[i - 1];
+
+      x1[i] = x1[i - 1] + velocity * delta_t * Math.cos(theta[i - 1]);
+      if (localMinX === undefined || x1[i] < localMinX) localMinX = x1[i];
+      if (localMaxX === undefined || x1[i] > localMaxX) localMaxX = x1[i];
+
+      x2[i] = x2[i - 1] + velocity * delta_t * Math.sin(theta[i - 1]);
+      if (localMinY === undefined || x2[i] < localMinY) localMinY = x2[i];
+      if (localMaxY === undefined || x2[i] > localMaxY) localMaxY = x2[i];
+    }
+
+    previousCoords = {
+      x1: x1,
+      x2: x2,
+      localMinX: localMinX,
+      localMaxX: localMaxX,
+      localMaxY: localMaxY,
+      localMinY: localMinY,
+    };
+  }
+
+  // console.log('minX', minX, 'maxX', maxX, 'X range', (maxX - minX), 'minY', minY, 'maxY', maxY, 'Y range', (maxY - minY));
+  // console.log('Center at', x1[Math.round(l / 2)], x2[Math.round(l / 2)], '.');
+  console.log('A: options.minX', options.minX, 'options.maxX', options.maxX, 'X range', (options.maxX - options.minX), 'minY', options.minY, 'maxY', options.maxY, 'Y range', (options.maxY - options.minY));
+  if (autoSize) {
+    pointFivePercent = (localMaxX - localMinX) / 200;
+
+    options.minX = localMinX - pointFivePercent;
+    options.maxX = 'minX + ' + (localMaxX - localMinX + pointFivePercent * 2);
+    options.maxY = localMaxY + pointFivePercent;
+    options.minY = 'maxY - (maxX - minX)';
+
+    populateForm();
+  }
+
+  minX = eval(options.minX);
+  maxX = eval(options.maxX);
+  maxY = eval(options.maxY);
+  minY = eval(options.minY);
+
+  console.log('B: localMinX', localMinX, 'localMaxX', localMaxX, 'X range', (localMaxX - localMinX), 'localMinY', localMinY, 'localMaxY', localMaxY, 'Y range', (localMaxY - localMinY));
+  console.log('B: options.minX', options.minX, 'options.maxX', options.maxX, 'X range', (options.maxX - options.minX), 'minY', options.minY, 'maxY', options.maxY, 'Y range', (options.maxY - options.minY));
+  console.log('B: minX', minX, 'maxX', maxX, 'X range', (maxX - minX), 'minY', minY, 'maxY', maxY, 'Y range', (maxY - minY));
+
+// put the pen down (initial values) //
+  i = 0;
+  l = x1.length;
+
+  if (options.maxSegments === 0) {
+    // All in one go
+    setStrokeColor();
+    setStrokeThickness();
+    setLineCap();
+    Ctx.beginPath();
+    for (i = 0; i < l; i++){
+      if (i === 0) {
+        x = XC(x1[i]);
+        y = YC(x2[i]);
+        Ctx.moveTo(x, y);
+      } else {
+        x = XC(x1[i]);
+        y = YC(x2[i]);
+        Ctx.lineTo(x, y);
+      }
+    }
+    Ctx.stroke();
+  } else {
+    // Animate
+    // Todo: use "requestAnimationFrame"
+    var drawCanvas = setInterval(function(){
+      setStrokeColor();
+      setStrokeThickness();
+      setLineCap();
+    // NOW START DRAWING...
+      Ctx.beginPath();
+      if (i === 0) {
+        x = XC(x1[i]);
+        y = YC(x2[i]);
+        Ctx.moveTo(x, y);
+        i++;
+      } else {
+          Ctx.moveTo(x, y);
+          for (j = 0; j < options.maxSegments; j++){
+            x = XC(x1[i]);
+            y = YC(x2[i]);
+            Ctx.lineTo(x, y);
+            i++;
+          }
+      }
+      Ctx.stroke();
+      if (isNaN(x)) {
+        console.log('done');
+        clearInterval(drawCanvas);
+      }
+    }, 0);
+  }
+}
+
+function setStrokeColor() {
+  // Todo: add gradient mode: http://stackoverflow.com/questions/7541286/how-can-i-plot-a-gradient-line-in-html-canvas
+
+  var i, l, red, green, blue;
+
+  if (options.colorMode === 'color') {
+    for (i = 0, l = 3; i < l; i++) {
+      red = Math.floor(Math.random() * 255);
+      green = Math.floor(Math.random() * 255);
+      blue = Math.floor(Math.random() * 255);
+      if (255 * 3 - (red + green + blue) > 64) break; //  Acceptable deviation from background color
+    }
+    Ctx.strokeStyle = 'rgba(' + red + ',' + green + ',' + blue + ',' + options.opacity + ')';
+  } else if (options.colorMode === 'grayscale') {
+    red = green = blue = Math.floor(Math.random() * 128);
+    Ctx.strokeStyle = 'rgba(' + red + ',' + green + ',' + blue + ',' + options.opacity + ')';
+  } else {
+    Ctx.strokeStyle = options.colorMode;
+  }
+}
+
+function setStrokeThickness() {
+  if (options.thicknessMode === 'random') {
+    Ctx.lineWidth = Math.floor(Math.random() * options.maxThickness) + options.minThickness;
+  } else {
+    Ctx.lineWidth = options.maxThickness;
+  }
+}
+
+function setLineCap() {
+  // Todo: will we use this? If not, remove.
+  // Default value is 'butt'
+  Ctx.lineCap = 'butt';
+}
+
+/* Initialization */
+
+// To be called when the page finishes loading:
+function refresh() {
+  retrieveFormValues();
+  updateBookmark();
+  Draw();
+}
+
+function populateForm() {
+  var createElems = false,
+      prop,
+      elems = '';
+
+  if ($('#options div').length === 0) {
+    createElems = true;
+  }
+
+  for (prop in options) {
+    if(options.hasOwnProperty(prop)) {
+
+      if (createElems) {
+        elems += '<div><label>' +  prop + '</label><input type="text" name="' +  prop + '" value="' + options[prop] + '"></div>';
+      } else {
+        $('#options input[name="' +  prop + '"]').val(options[prop]);
+      }
+    }
+  }
+
+  if (createElems) {
+    $('#options').prepend(elems);
+  }
+}
+
+function retrieveFormValues() {
+  var prop,
+      val,
+      newOptions = {},
+      i,
+      l,
+      theseOptions = [
+        'TF',
+        'dt',
+        'clxpo',
+        'cloff',
+        'overdraw'
+      ];
+  for(prop in options) {
+    if(options.hasOwnProperty(prop)) {
+      val = $('#options input[name="' +  prop + '"]').val();
+      try {
+        if (parseFloat(val) === eval(val)) {
+          newOptions[prop] = eval(val);
+        } else {
+          newOptions[prop] = val;
+        }
+      } catch (e) {
+        newOptions[prop] = val;
+      }
+    }
+  }
+
+  for (i = 0, l = theseOptions.length; i < l; i++) {
+    if (options[theseOptions[i]] !== newOptions[theseOptions[i]]) {
+      previousCoords = null;
+      break;
+    }
+  }
+
+  options = newOptions;
+}
+
+function updateBookmark() {
+  $('input[name="bookmark"]').val( JSON.stringify(options) );
+}
+
+function applyBookmark() {
+  options = JSON.parse( $('input[name="bookmark"]').val() );
+  populateForm();
+  refresh();
+}
+
+
+
+/* Canvas and context objects */
+
+var $canvas,
+    canvasElem,
+    Ctx,
+    Width,
+    Height;
+
+
+/*
+  The origin (0,0) of the canvas is the upper left:
+
+  (0,0)
+    --------- +X
+   |
+   |
+   |
+   |
+   +Y
+
+  Positive x coordinates go to the right, and positive y coordinates go down.
+
+  The origin in mathematics is the "center," and positive y goes *up*.
+
+  We'll refer to the mathematics coordinate system as the "logical"
+  coordinate system, and the coordinate system for the canvas as the
+  "physical" coordinate system.
+
+  The functions just below set up a mapping between the two coordinate
+  systems.
+
+  They're defined as functions, so that one wanted to, they could read
+  ther values from a from instead of having them hard-coded.
+
+ */
+
+// Returns the physical x-coordinate of a logical x-coordinate:
+function XC(x) {
+  return (x - minX) / (maxX - minX) * Width;
+}
+
+// Returns the physical y-coordinate of a logical y-coordinate:
+function YC(y) {
+  return Height - (y - minY) / (maxY - minY) * Height;
+}
+
+
+/* Rendering functions */
+
+// Clears the canvas, draws the axes and graphs the function F.
+function Draw() {
+  var maxThickness,
+      animateThicknessInterval;
+
+
+  if (canvasElem.getContext) {
+
+    // Set up the canvas:
+    Ctx = canvasElem.getContext('2d');
+    Ctx.clearRect(0, 0, Width, Height);
+
+    // Draw:
+    DrawAxes();
+
+    if (options.animateThickness) {
+      maxThickness = options.maxThickness;
+      options.maxThickness = options.minThickness;
+      animateThicknessInterval = setInterval(function(){
+        Ctx.clearRect(0, 0, Width, Height);
+        RenderClaire();
+        options.maxThickness += options.animateThickness;
+        if (options.maxThickness > maxThickness) {
+          clearInterval(animateThicknessInterval);
+          options.maxThickness = maxThickness;
+        }
+      }, 0);
+    } else if (options.animateTF) {
+      TF = options.TF;
+      options.TF = options.minTF;
+      animateTFInterval = setInterval(function(){
+        /* Add rainbow option, without clearRect */
+        Ctx.clearRect(0, 0, Width, Height);
+        RenderClaire();
+        options.TF += options.animateTF;
+        if (options.TF > TF) {
+          clearInterval(animateTFInterval);
+          options.TF = TF;
+        }
+      }, 500);
+    } else {
+      RenderClaire();
+    }
+
+  } else {
+    // Do nothing.
+    console.log('Do nothing.');
+  }
+}
+
+
+// Returns the distance between ticks on the X axis:
+function XTickDelta() {
+  return 1;
+}
+
+// Returns the distance between ticks on the Y axis:
+function YTickDelta() {
+  return 1;
+}
+
+
+// DrawAxes draws the X ad Y axes, with tick marks.
+function DrawAxes() {
+ if (window.hideAxes === true) return;
+ Ctx.save();
+ Ctx.lineWidth = 2;
+ // +Y axis
+ Ctx.beginPath();
+ Ctx.moveTo(XC(0),YC(0));
+ Ctx.lineTo(XC(0),YC(maxY));
+ Ctx.stroke();
+
+ // -Y axis
+ Ctx.beginPath();
+ Ctx.moveTo(XC(0),YC(0));
+ Ctx.lineTo(XC(0),YC(minY));
+ Ctx.stroke();
+
+ // Y axis tick marks
+ var delta = YTickDelta();
+ for (var i = 1; (i * delta) < maxY; ++i) {
+  Ctx.beginPath();
+  Ctx.moveTo(XC(0) - 5,YC(i * delta));
+  Ctx.lineTo(XC(0) + 5,YC(i * delta));
+  Ctx.stroke();
+ }
+
+ var delta = YTickDelta();
+ for (var i = 1; (i * delta) > minY; --i) {
+  Ctx.beginPath();
+  Ctx.moveTo(XC(0) - 5,YC(i * delta));
+  Ctx.lineTo(XC(0) + 5,YC(i * delta));
+  Ctx.stroke();
+ }
+
+ // +X axis
+ Ctx.beginPath();
+ Ctx.moveTo(XC(0),YC(0));
+ Ctx.lineTo(XC(maxX),YC(0));
+ Ctx.stroke();
+
+ // -X axis
+ Ctx.beginPath();
+ Ctx.moveTo(XC(0),YC(0));
+ Ctx.lineTo(XC(minX),YC(0));
+ Ctx.stroke();
+
+ // X tick marks
+ var delta = XTickDelta();
+ for (var i = 1; (i * delta) < maxX; ++i) {
+  Ctx.beginPath();
+  Ctx.moveTo(XC(i * delta),YC(0)-5);
+  Ctx.lineTo(XC(i * delta),YC(0)+5);
+  Ctx.stroke();
+ }
+
+ var delta = XTickDelta();
+ for (var i = 1; (i * delta) > minX; --i) {
+  Ctx.beginPath();
+  Ctx.moveTo(XC(i * delta),YC(0)-5);
+  Ctx.lineTo(XC(i * delta),YC(0)+5);
+  Ctx.stroke();
+ }
+ Ctx.restore();
+}
+
+// When rendering, XSTEP determines the horizontal distance between points:
+var XSTEP = (maxX-minX)/Width;
+
+
+
+function hideControls() {
+  $('.controls').hide();
+  $('.showControls').removeClass('hide');
+  $('.hideControls').addClass('hide');
+}
+
+function showControls() {
+  $('.controls').show();
+  $('.hideControls').removeClass('hide');
+  $('.showControls').addClass('hide');
+}
+
+
+
+$(document).ready(function(){
+  $canvas = $('#xy-graph');
+  canvasElem = $canvas[0];
+  Ctx = null;
+  Width = Height = $(window).width();
+  $canvas.attr('width', Width).attr('height', Width);
+
+  populateForm();
+
+  refresh();
+
+  $('.hideControls').on('click', function(event) {
+    event.preventDefault();
+    hideControls();
+  });
+
+  $('.showControls').on('click', function(event) {
+    event.preventDefault();
+    showControls();
+  });
+
+  $('input').focus(function(){
+    var $label = $(this).siblings('label'),
+        labelWidth = $label.width();
+    $label.css('left', -1 * labelWidth - 6);
+    /* $label.css('left', $(this).width() - labelWidth).animate({
+      'left': -1 * labelWidth - 6
+    }, 200); */
+  }).blur(function(){
+    $(this).siblings('label').stop().removeAttr('style');
+  });
+});
+</script>
+</head>
+<body style="background-color: #fff">
+
+<canvas id="xy-graph" width="1440" height="1440"></canvas>
+
+<div class="controls">
+  <form id="options" onsubmit="refresh(); return false;">
+    <input class="btn-primary" type="submit" value="Draw">
+  </form>
+  <br>
+  <form onsubmit="applyBookmark(); return false;">
+    <div><label>"Bookmark"</label> <input type="text" name="bookmark"><br></div>
+    <input class="btn-primary" type="submit" value="Apply">
+  </form>
+</div>
+
+<button class="btn btn-mini showControls hide" type="button" title="Show"><i class="icon-plus"></i></button>
+<button class="btn btn-mini hideControls" type="button" title="Hide"><i class="icon-minus"></i></button>
+
+</body>
+</html>
